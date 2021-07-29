@@ -34,10 +34,8 @@ THE SOFTWARE.
 
 #include "I2Cdev.h"
 
-
-#define AD7746_ADDRESS           0x48
-#define AD7746_DEFAULT_ADDRESS   AD7746_ADDRESS           
-
+#define AD7746_ADDRESS                   0x48
+#define AD7746_DEFAULT_ADDRESS           AD7746_ADDRESS           
 
 #define AD7746_RA_STATUS                 0x00 // Status
 #define AD7746_RA_CAP_DATA_H             0x01 // Cap data
@@ -58,12 +56,11 @@ THE SOFTWARE.
 #define AD7746_RA_CAP_GAIN_L             0x10
 #define AD7746_RA_VOLT_GAIN_H            0x11
 #define AD7746_RA_VOLT_GAIN_L            0x12
-
 #define AD7746_RESET                     0xBF
 
 // Status
 #define AD7746_EXCERR_BIT                3
-#define AD7746_RDY_BIT		             2
+#define AD7746_RDY_BIT		               2
 #define AD7746_RDYVT_BIT                 1
 #define AD7746_RDYCAP_BIT                0
 
@@ -82,7 +79,7 @@ THE SOFTWARE.
 #define AD7746_VTMD_BIT_0                5
 #define AD7746_EXTREF_BIT                4
 #define AD7746_VTSHORT_BIT               1
-#define AD7746_VTCHOP_BIT	             0
+#define AD7746_VTCHOP_BIT	               0
 
 #define AD7746_VTEN                      (1 << AD7746_VTEN_BIT)
 
@@ -92,12 +89,12 @@ THE SOFTWARE.
 #define AD7746_VTMD_VIN                  (1 << AD7746_VTMD_BIT_1) | (1 << AD7746_VTMD_BIT_0)
 
 // Exc Setup
-#define AD7746_CLKCTRL_BIT		         7 
-#define AD7746_EXCON_BIT		         6                                            
-#define AD7746_EXCB_BIT		             5
-#define AD7746_INV_EXCB_BIT		         4
-#define AD7746_EXCA_BIT		             3
-#define AD7746_INV_EXCA_BIT		         2
+#define AD7746_CLKCTRL_BIT		           7 
+#define AD7746_EXCON_BIT		             6                                            
+#define AD7746_EXCB_BIT		               5
+#define AD7746_INV_EXCB_BIT		           4
+#define AD7746_EXCA_BIT		               3
+#define AD7746_INV_EXCA_BIT		           2
 #define AD7746_EXCLVL_BIT_1              1
 #define AD7746_EXCLVL_BIT_0              0
 
@@ -143,14 +140,11 @@ THE SOFTWARE.
 
 // Cap DAC A
 #define AD7746_DACAEN_BIT                7
-
 #define AD7746_DACAEN                    (1 << AD7746_DACAEN_BIT)
 
 // Cap DAC B
 #define AD7746_DACBEN_BIT                7
-
 #define AD7746_DACBEN                    (1 << AD7746_DACBEN_BIT)
-
 
 #define AD7746_DAC_COEFFICIENT           0.13385826771654F // 17pF/127
 
