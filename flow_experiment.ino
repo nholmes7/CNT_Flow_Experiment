@@ -27,6 +27,102 @@ uint8_t stat;
 // initialize sensor objects
 AD7746 sensor1;
 
+void processSerialByte(const byte inByte)
+{
+  // static variables are only created and initialized the first
+  // time the function is called
+  static char message [10];
+  static unsigned int i = 0;
+
+  message [i++] = inByte;
+
+  switch (inByte)
+  {
+  case '\r':
+    decide(message)
+    i = 0;
+    // apparently this resets the whol char array?  Need to verify
+    message[0] = (char)0;
+    break;
+  
+  default:
+    break;
+  }
+}
+
+char parseCommand(const char message[])
+{
+  char command[2];
+  command[0] = message[1];
+  command[1] = message[2];
+  return command;
+}
+
+void decide(const char message[])
+{
+  char command[2];
+  command = parseCommand(message);
+  switch (command)
+  {
+  case "RC":
+    uint32_t reportedCap;
+    reportedCap = sensor.getCapacitance();
+    break;
+
+  case "RS":
+    uint8_t reportedStatus;
+    char serialReturnValue[2];
+    reportedStatus = sensor.reportStatus();
+    serialReturnValue = 
+    break;
+
+  case "SC":
+    sensor.writeCapSetupRegister(value);
+    break;
+
+  case "OM":
+    sensor.writeConfigurationRegister(value);
+    break;
+  
+  case "CT":
+    sensor.writeConfigurationRegister(value);
+    break;
+  
+  case "CD":
+    sensor.writeCapDacARegister(value);
+    break;
+  
+  case "SO":
+    // sensor.write
+    break;
+  
+  case "CS":
+    break;
+
+  default:
+    break;
+  }
+}
+
+void ASCIIConvert (uint32_t value,uint8_t *modified,int arraySize)
+{
+  int shiftValue;
+  for (int i=0;i<arraySize;i++)
+  {
+    shiftValue = ((arraySize-1)*4-i*4);
+    *modified = ((value & (0b00001111 << shiftValue)) >> shiftValue);
+    if (*modified>9)
+    {
+      *modified += 55;
+    }
+    else
+    {
+      *modified += 48;
+    }
+    modified++;
+  }
+}
+
 void setup() {
   // initiate serial connections
   Serial.begin(9600);
@@ -67,4 +163,9 @@ void loop() {
   
   Serial.println(cap);
   delay(100);
+
+  while (Serial.available())
+  {
+    processSerialByte(Serial.read());
+  }
 }
