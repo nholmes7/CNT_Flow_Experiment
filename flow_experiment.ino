@@ -1,6 +1,7 @@
 #include <AD7746.h>
 #include <Wire.h>
-
+#include <RingBuf.h>
+#include <Task.h>
 
 #define address_0 12           // pin address for multiplexer address 0
 #define address_1 11           // pin address for multiplexer address 1
@@ -19,27 +20,27 @@
 // Define serial commands
 #define RC  1
 #define RS  2
-#define SC  3
+#define RV  3
 #define OM  4
 #define CT  5
 #define CD  6
 #define SO  7
 #define CS  8
 
-// const int message_len = 5;
-// char message[message_len];
-// char valid_message[5] = "data";
-bool valid = false;
-byte result;
-uint32_t cap;
-uint8_t stat;
-char command[2];
-int switchCase;
-uint32_t reportedCap;
-uint8_t reportedCapASCIIhex[6];
-uint8_t reportedStatus;
-uint8_t reportedStatusASCIIhex[2];
-uint8_t reply[10];
+struct sensorReading
+{
+  uint32_t value;
+  uint8_t _sensorID;
+  uint8_t _channelID;
+  uint32_t timestamp;
+}
+
+// Define buffers and stuff
+RingBuf<sensorReading,20> readingsBuffer;
+RingBuf<Task,20> taskBuffer;
+uint8_t messageBufffer[200];
+
+bool busFree = true;
 
 // initialize sensor objects
 AD7746 sensor;
@@ -70,8 +71,9 @@ void processSerialByte(uint8_t inByte)
     message [i++] = inByte;
     break;
   case ';':
-    decide(message);
+    busFree = true;
     readingMessage = false;
+    buildTask(message);
     break;
   
   default:
@@ -79,98 +81,45 @@ void processSerialByte(uint8_t inByte)
   }
 }
 
-void parseCommand(const char message[10])
+void buildTask(const char message[10])
 {
- Serial.print(F("uM received this message: "));
- Serial.println(message);
- switchCase = 0;
- command[0] = message[1];
- command[1] = message[2];
- if ((command[0] == 'R') && (command[1] == 'C'))
- {
-   switchCase = RC;
- }
- else if ((command[0] == 'R') && (command[1] == 'S'))
- {
-   switchCase = RS;
- }
- 
+ uint8_t taskID = parseCommand(message);
+ // need to pull the sensorID and channelID from the message here
+ uint8_t sensorID = message[3];
+ uint8_t channelID = message[4]; 
+ Task newTask(sensorID,channelID,taskID);
+ taskBuffer.push(newTask)
 }
 
-void decide(const char message[10])
+uint8_t parseCommand(const char message[10])
 {
- parseCommand(message);
- switch (switchCase)
+ uint8_t command = 0;
+ uint8_t charOne = message[1];
+ uint8_t charTwo = message[2];
+ if ((charOne == 'R') && (charTwo == 'C'))
  {
- case RC:
-   reportedCap = sensor.getCapacitance();
-   ASCIIConvert(reportedCap,&reportedCapASCIIhex[0],6);
-   buildMessageFrame(&reportedCapASCIIhex[0],&reply[0],8);
-   writeSerialResponse(&reply[0],8);
-   break;
-
- case RS:
-   reportedStatus = sensor.reportStatus();
-   ASCIIConvert(reportedStatus,&reportedStatusASCIIhex[0],2);
-   buildMessageFrame(&reportedStatusASCIIhex[0],&reply[0],4);
-   writeSerialResponse(&reply[0],4);
-   break;
-/*
- case "SC":
-   sensor.writeCapSetupRegister(value);
-   break;
-
- case "OM":
-   sensor.writeConfigurationRegister(value);
-   break;
- 
- case "CT":
-   sensor.writeConfigurationRegister(value);
-   break;
- 
- case "CD":
-   sensor.writeCapDacARegister(value);
-   break;
- 
- case "SO":
-   // sensor.write
-   break;
- 
- case "CS":
-   break;
-*/
-
- default:
-   break;
+   command = RC;
  }
+ else if ((charOne == 'R') && (charTwo == 'S'))
+ {
+   command = RS;
+ }
+ else if ((charOne == 'R') && (charTwo == 'V'))
+ {
+   command = RV;
+ }
+ return command;
 }
 
-/* Takes the data to send in a message, and builds a frame around
-it by adding a # at the start and a CR and LF at the end.*/
-void buildMessageFrame(uint8_t *data,uint8_t *reply,uint8_t messageLength)
+void writeSerialResponse(uint8_t *response)
 {
-  // clear pre-existing reply
-  for (int i=0;i<10;i++){
-    *reply = 0;
-    reply++;
-  }
-
-  reply -= 10;
-  
-  *reply = 0x23;
-  reply++;
-  for (int i=0;i<(messageLength-2);i++){
-    *reply = *data;
-    data++;
-    reply++;
-  }
-  *reply = 0x3B;
-}
-
-void writeSerialResponse(uint8_t *response,uint8_t responseLength)
-{
-  for (int i=0;i<responseLength;i++){
+  while ()
+  {
     Serial.write(*response);
+    if (*response == 59)
+    {
+      break;
+    }
     response++;
   }
 }
@@ -230,29 +179,31 @@ void setup() {
   sensor.writeConfigurationRegister(Configuration);
   sensor.writeCapDacARegister(Cap_DAC_A);
   
-  // set up the multiplexer to communicate over channel 7
-  Wire.beginTransmission(multiplexer_addr);
-  Wire.write(0b10000000);
-  result = Wire.endTransmission();
-  if (result) {
-    Serial.println(F("Failed to set multiplexer output channel."));
-  }
+  Task currentTask;
   
 }
 
 void loop() {
-//   stat = sensor.reportStatus();
-//   cap = sensor.getCapacitance();
   
-// //  Serial.print(F("Status byte is: "));
-// //  Serial.println(stat,BIN);
-// //  Serial.print(F("Cap is: "));
-  
-//   Serial.println(cap);
-//   delay(100);
-
+  // Receive input from the serial input buffer
   while (Serial.available())
   {
+    busFree = false;
     processSerialByte(Serial.read());
+  }
+  
+  // Perform any tasks which may be waiting
+  while (taskBuffer.pop(currentTask))
+  {
+    currentTask.executeTask();
+  }
+  
+  // Add a message to serial out buffer if one is ready
+  if (messageBuffer[0])
+  {
+    if (busFree)
+    {
+      writeSerialResponse(&messageBufffer[0])
+    }
   }
 }
