@@ -3,11 +3,10 @@
     Created by Nathaniel Holmes, August 16th 2021.
 */
 
-#include "Arduino.h"
-
 #ifndef Task_h
 #define Task_h
 
+#include "Arduino.h"
 
 class Task
 {

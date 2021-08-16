@@ -36,7 +36,7 @@ struct sensorReading
 }
 
 // Define buffers and stuff
-RingBuf<sensorReading,20> readingsBuffer;
+RingBuf<sensorReading,5> readingsBuffer;
 RingBuf<Task,20> taskBuffer;
 uint8_t messageBufffer[200];
 
@@ -174,7 +174,6 @@ void setup() {
   digitalWrite(address_2,LOW);
 
   // set control registers
-  sensor.writeCapSetupRegister(Cap_Setup_1);
   sensor.writeExcSetupRegister(EXC_Setup);
   sensor.writeConfigurationRegister(Configuration);
   sensor.writeCapDacARegister(Cap_DAC_A);

@@ -6,16 +6,6 @@
 #include "Arduino.h"
 #include "Task.h"
 
-// Define serial commands
-#define RC  1
-#define RS  2
-#define RV  3
-#define OM  4
-#define CT  5
-#define CD  6
-#define SO  7
-#define CS  8
-
 Task::Task(uint8_t sensorID,uint8_t channelID,uint8_t taskID)
 {
   _sensorID = sensorID;
@@ -124,6 +114,10 @@ void Task::readValue()
     currentReading._sensorID = _sensorID;
     currentReading._channelID = _channelID;
     currentReading.timestamp = millis();
+    if (readingsBuffer.isFull())
+    {
+        readingsBuffer.pop();
+    }
     readingsBuffer.push(currentReading);
 }
 
