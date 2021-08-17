@@ -57,6 +57,12 @@ AD7746 sensor;
 
 void executeTask(struct Task task)
 {
+  if (task.taskID == RC)
+  {
+    readCapacitance();
+    return;
+  }
+  
   // Change multiplexer to correct channel
   uint8_t result;
   Wire.beginTransmission(multiplexer_addr);
@@ -75,6 +81,7 @@ void executeTask(struct Task task)
       Wire.write(0b10000000);
       break;
   default:
+      Serial.println(F("Invalid multiplexer channel."));
       break;
   }
   result = Wire.endTransmission();
@@ -96,10 +103,6 @@ void executeTask(struct Task task)
   // Now execute the correct task
   switch (task.taskID)
   {
-  case RC:
-    readCapacitance();
-    break;
-
   case RV:
     readValue(task);
     break;
@@ -117,6 +120,7 @@ void executeTask(struct Task task)
   //   break;
   
   default:
+    Serial.println(F("Invalid taskID."));
     break;
   }
 }
@@ -135,9 +139,9 @@ void readCapacitance()
     int i = 1;
     while (readingsBuffer.pull(&reading))
     {
-        messageBuffer[i] = reading._sensorID;
+        messageBuffer[i] = reading._sensorID + 48;
         i++;
-        messageBuffer[i] = reading._channelID;
+        messageBuffer[i] = reading._channelID + 48;
         i++;
         ASCIIConvert(reading.value,&messageBuffer[i],6);
         i+=6;
@@ -170,9 +174,10 @@ void readStatus(struct Task task)
     reportedStatus = sensor.reportStatus();
 
     messageBuffer[0] = 35;  // "#" start character
-    messageBuffer[1] = task.sensorID;
-    messageBuffer[2] = task.channelID;
-    messageBuffer[3] = reportedStatus;
+    // add 48 to convert to ascii value
+    messageBuffer[1] = task.sensorID + 48;
+    messageBuffer[2] = task.channelID + 48;
+    messageBuffer[3] = reportedStatus + 48;
     messageBuffer[4] = 59;  // ";" end character
 }
 
@@ -224,14 +229,16 @@ void processSerialByte(uint8_t inByte)
 
 void buildTask(const char message[10])
 {
- uint8_t taskID = parseCommand(message);
- // need to pull the sensorID and channelID from the message here
- uint8_t sensorID = message[3];
- uint8_t channelID = message[4];
  struct Task newTask;
- newTask.sensorID = sensorID;
- newTask.channelID = channelID;
- newTask.taskID = taskID; 
+ uint8_t taskID = parseCommand(message);
+ newTask.taskID = taskID;
+ if (taskID != RC)
+ {
+  uint8_t sensorID = message[3] - 48;
+  uint8_t channelID = message[4] - 48;
+  newTask.sensorID = sensorID;
+  newTask.channelID = channelID;
+ }  
  taskBuffer.add(newTask);
 }
 
@@ -344,6 +351,7 @@ void loop() {
     if (busFree)
     {
       writeSerialResponse(&messageBuffer[0]);
+      messageBuffer[0] = 0;
     }
   }
 }
