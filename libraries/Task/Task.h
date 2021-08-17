@@ -12,10 +12,13 @@ class Task
 {
   public:
     Task(uint8_t sensorID,uint8_t channelID,uint8_t taskID);
-    void executeTask();
     uint8_t _sensorID;
     uint8_t _channelID;
     uint8_t _taskID;
+    void executeTask();
+    void readCapacitance();
+    void readValue();
+    void readStatus();
 };
 
 #endif

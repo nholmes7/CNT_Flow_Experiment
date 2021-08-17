@@ -5,6 +5,49 @@
 
 #include "Arduino.h"
 #include "Task.h"
+#include <Wire.h>
+#include <AD7746.h>
+#include <RingBufCPP.h>
+
+#define multiplexer_addr 0x70
+// Define serial commands
+#define RC  1
+#define RS  2
+#define RV  3
+
+// initialize sensor objects
+AD7746 sensor;
+
+struct sensorReading
+{
+  uint32_t value;
+  uint8_t _sensorID;
+  uint8_t _channelID;
+  uint32_t timestamp;
+};
+
+// Define buffers and stuff
+RingBufCPP<struct sensorReading,5> readingsBuffer;
+uint8_t messageBuffer[200];
+
+void ASCIIConvert (uint32_t value,uint8_t *modified,int arraySize)
+{
+ int shiftValue;
+ for (int i=0;i<arraySize;i++)
+ {
+   shiftValue = ((arraySize-1)*4-i*4);
+   *modified = ((value & (0b00001111 << shiftValue)) >> shiftValue);
+   if (*modified>9)
+   {
+     *modified += 55;
+   }
+   else
+   {
+     *modified += 48;
+   }
+   modified++;
+ }
+}
 
 Task::Task(uint8_t sensorID,uint8_t channelID,uint8_t taskID)
 {
@@ -66,13 +109,13 @@ void Task::executeTask()
     readStatus();
     break;
 
-  case RC:
-    setOffset();
-    break;
+  // case RC:
+  //   setOffset();
+  //   break;
 
-  case RC:
-    setOpMode();
-    break;
+  // case RC:
+  //   setOpMode();
+  //   break;
   
   default:
     break;
@@ -91,7 +134,7 @@ void Task::readCapacitance()
     messageBuffer[0] = 35;  // "#" start character
 
     int i = 1;
-    while (readingsBuffer.pop(reading))
+    while (readingsBuffer.pull(&reading))
     {
         messageBuffer[i] = reading._sensorID;
         i++;
@@ -110,15 +153,16 @@ void Task::readValue()
     uint32_t reportedCap;
     reportedCap = sensor.getCapacitance();
     struct sensorReading currentReading;
+    struct sensorReading toDelete;
     currentReading.value = reportedCap;
     currentReading._sensorID = _sensorID;
     currentReading._channelID = _channelID;
     currentReading.timestamp = millis();
     if (readingsBuffer.isFull())
     {
-        readingsBuffer.pop();
+        readingsBuffer.pull(&toDelete);
     }
-    readingsBuffer.push(currentReading);
+    readingsBuffer.add(currentReading);
 }
 
 void Task::readStatus()
@@ -133,12 +177,12 @@ void Task::readStatus()
     messageBuffer[4] = 59;  // ";" end character
 }
 
-void Task::setOffset()
-{
-    ;
-}
+// void Task::setOffset()
+// {
+//     ;
+// }
 
-void Task::setOpMode()
-{
-    ;
-}
+// void Task::setOpMode()
+// {
+//     ;
+// }

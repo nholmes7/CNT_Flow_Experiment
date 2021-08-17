@@ -1,7 +1,8 @@
 #include <AD7746.h>
 #include <Wire.h>
-#include <RingBuf.h>
+#include <RingBufCPP.h>
 #include <Task.h>
+
 
 #define address_0 12           // pin address for multiplexer address 0
 #define address_1 11           // pin address for multiplexer address 1
@@ -33,14 +34,16 @@ struct sensorReading
   uint8_t _sensorID;
   uint8_t _channelID;
   uint32_t timestamp;
-}
+};
 
 // Define buffers and stuff
-RingBuf<sensorReading,5> readingsBuffer;
-RingBuf<Task,20> taskBuffer;
-uint8_t messageBufffer[200];
+RingBufCPP<struct sensorReading,5> readingsBuffer;
+RingBufCPP<class Task,20> taskBuffer;
+uint8_t messageBuffer[200];
 
+Task currentTask(1,1,1);
 bool busFree = true;
+
 
 // initialize sensor objects
 AD7746 sensor;
@@ -88,7 +91,7 @@ void buildTask(const char message[10])
  uint8_t sensorID = message[3];
  uint8_t channelID = message[4]; 
  Task newTask(sensorID,channelID,taskID);
- taskBuffer.push(newTask)
+ taskBuffer.add(newTask);
 }
 
 uint8_t parseCommand(const char message[10])
@@ -113,7 +116,7 @@ uint8_t parseCommand(const char message[10])
 
 void writeSerialResponse(uint8_t *response)
 {
-  while ()
+  while (true)
   {
     Serial.write(*response);
     if (*response == 59)
@@ -176,10 +179,7 @@ void setup() {
   // set control registers
   sensor.writeExcSetupRegister(EXC_Setup);
   sensor.writeConfigurationRegister(Configuration);
-  sensor.writeCapDacARegister(Cap_DAC_A);
-  
-  Task currentTask;
-  
+  sensor.writeCapDacARegister(Cap_DAC_A);  
 }
 
 void loop() {
@@ -192,7 +192,7 @@ void loop() {
   }
   
   // Perform any tasks which may be waiting
-  while (taskBuffer.pop(currentTask))
+  while (taskBuffer.pull(&currentTask))
   {
     currentTask.executeTask();
   }
@@ -202,7 +202,7 @@ void loop() {
   {
     if (busFree)
     {
-      writeSerialResponse(&messageBufffer[0])
+      writeSerialResponse(&messageBuffer[0]);
     }
   }
 }
