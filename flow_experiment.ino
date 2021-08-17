@@ -1,7 +1,7 @@
 #include <AD7746.h>
 #include <Wire.h>
 #include <RingBufCPP.h>
-#include <Task.h>
+// #include <Task.h>
 
 
 #define address_0 12           // pin address for multiplexer address 0
@@ -36,17 +36,155 @@ struct sensorReading
   uint32_t timestamp;
 };
 
+struct Task
+{
+  uint8_t sensorID;
+  uint8_t channelID;
+  uint8_t taskID;
+};
+
 // Define buffers and stuff
 RingBufCPP<struct sensorReading,5> readingsBuffer;
-RingBufCPP<class Task,20> taskBuffer;
+RingBufCPP<struct Task,20> taskBuffer;
 uint8_t messageBuffer[200];
 
-Task currentTask(1,1,1);
+struct Task currentTask;
 bool busFree = true;
 
 
 // initialize sensor objects
 AD7746 sensor;
+
+void executeTask(struct Task task)
+{
+  // Change multiplexer to correct channel
+  uint8_t result;
+  Wire.beginTransmission(multiplexer_addr);
+  switch (task.sensorID)
+  {
+  case 1:
+      Wire.write(0b00010000);
+      break;
+  case 2:
+      Wire.write(0b00100000);
+      break;
+  case 3:
+      Wire.write(0b01000000);
+      break;
+  case 4:
+      Wire.write(0b10000000);
+      break;
+  default:
+      break;
+  }
+  result = Wire.endTransmission();
+  
+  if (result) {
+    Serial.println(F("Failed to set multiplexer output channel."));
+  }
+  
+  // Set the AD7746 channel
+  if (task.channelID == 1)
+  {
+      sensor.writeCapSetupRegister(0b10000000);
+  }
+  else if (task.channelID == 2)
+  {
+      sensor.writeCapSetupRegister(0b11000000);
+  }
+
+  // Now execute the correct task
+  switch (task.taskID)
+  {
+  case RC:
+    readCapacitance();
+    break;
+
+  case RV:
+    readValue(task);
+    break;
+
+  case RS:
+    readStatus(task);
+    break;
+
+  // case RC:
+  //   setOffset();
+  //   break;
+
+  // case RC:
+  //   setOpMode();
+  //   break;
+  
+  default:
+    break;
+  }
+}
+
+void readCapacitance()
+{
+    struct sensorReading reading;
+    // uint16_t bufferSize = readingsBuffer.size();
+    // A message consists of a start and end character, with 6 HEX
+    // characters representing the value of the capacitance, plus 
+    // 2 extra characters for the channel and sensor IDs.
+    // uint16_t messageSize = (6+2)*bufferSize + 2;
+    // uint8_t message[messageSize];
+    messageBuffer[0] = 35;  // "#" start character
+
+    int i = 1;
+    while (readingsBuffer.pull(&reading))
+    {
+        messageBuffer[i] = reading._sensorID;
+        i++;
+        messageBuffer[i] = reading._channelID;
+        i++;
+        ASCIIConvert(reading.value,&messageBuffer[i],6);
+        i+=6;
+        ASCIIConvert(reading.timestamp,&messageBuffer[i],8);
+        i+=8;
+    }
+    messageBuffer[i] = 59;  // ";" end character
+}
+
+void readValue(struct Task task)
+{
+    uint32_t reportedCap;
+    reportedCap = sensor.getCapacitance();
+    struct sensorReading currentReading;
+    struct sensorReading toDelete;
+    currentReading.value = reportedCap;
+    currentReading._sensorID = task.sensorID;
+    currentReading._channelID = task.channelID;
+    currentReading.timestamp = millis();
+    if (readingsBuffer.isFull())
+    {
+        readingsBuffer.pull(&toDelete);
+    }
+    readingsBuffer.add(currentReading);
+}
+
+void readStatus(struct Task task)
+{
+    uint8_t reportedStatus;
+    reportedStatus = sensor.reportStatus();
+
+    messageBuffer[0] = 35;  // "#" start character
+    messageBuffer[1] = task.sensorID;
+    messageBuffer[2] = task.channelID;
+    messageBuffer[3] = reportedStatus;
+    messageBuffer[4] = 59;  // ";" end character
+}
+
+// void Task::setOffset()
+// {
+//     ;
+// }
+
+// void Task::setOpMode()
+// {
+//     ;
+// }
 
 void processSerialByte(uint8_t inByte)
 {
@@ -89,8 +227,11 @@ void buildTask(const char message[10])
  uint8_t taskID = parseCommand(message);
  // need to pull the sensorID and channelID from the message here
  uint8_t sensorID = message[3];
- uint8_t channelID = message[4]; 
- Task newTask(sensorID,channelID,taskID);
+ uint8_t channelID = message[4];
+ struct Task newTask;
+ newTask.sensorID = sensorID;
+ newTask.channelID = channelID;
+ newTask.taskID = taskID; 
  taskBuffer.add(newTask);
 }
 
@@ -179,7 +320,7 @@ void setup() {
   // set control registers
   sensor.writeExcSetupRegister(EXC_Setup);
   sensor.writeConfigurationRegister(Configuration);
-  sensor.writeCapDacARegister(Cap_DAC_A);  
+  // sensor.writeCapDacARegister(Cap_DAC_A);  
 }
 
 void loop() {
@@ -194,7 +335,7 @@ void loop() {
   // Perform any tasks which may be waiting
   while (taskBuffer.pull(&currentTask))
   {
-    currentTask.executeTask();
+    executeTask(currentTask);
   }
   
   // Add a message to serial out buffer if one is ready
