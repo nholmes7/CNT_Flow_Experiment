@@ -1,6 +1,8 @@
 #include <AD7746.h>
 #include <Wire.h>
 #include <RingBufCPP.h>
+#include <avr/io.h>
+#include <avr/interrupt.h>
 // #include <Task.h>
 
 
@@ -13,20 +15,22 @@
 #define Cap_Setup_1     0b10000000
 #define Cap_Setup_2     0b11000000
 #define EXC_Setup       0b00000111
-#define Configuration   0b11111001
+#define Configuration   0b11000001
 #define Cap_DAC_A       0b00011100
 #define Cap_Offset_H    0x80
 #define Cap_Offset_L    0x00
 
 // Define serial commands
-#define RC  1
-#define RS  2
-#define RV  3
-#define OM  4
+#define RC  1   // read capacitance
+#define RS  2   // read status
+#define RV  3   // read value
+#define OM  4 
 #define CT  5
 #define CD  6
 #define SO  7
 #define CS  8
+#define AS  9   // activate sensor
+#define DS 10   // deactivate sensor
 
 struct sensorReading
 {
@@ -50,20 +54,22 @@ uint8_t messageBuffer[200];
 
 struct Task currentTask;
 bool busFree = true;
-
-
+volatile uint8_t interruptFlag = 0;
+uint8_t activeSensors = 0b00000000;
 // initialize sensor objects
 AD7746 sensor;
 
 void executeTask(struct Task task)
 {
+  // Reading the capacitance empties the readingsBuffer and does not require 
+  // a specific device to be addressed
   if (task.taskID == RC)
   {
     readCapacitance();
     return;
   }
-  
-  // Change multiplexer to correct channel
+
+  // Change multiplexer to address the correct device
   uint8_t result;
   Wire.beginTransmission(multiplexer_addr);
   switch (task.sensorID)
@@ -82,22 +88,30 @@ void executeTask(struct Task task)
       break;
   default:
       Serial.println(F("Invalid multiplexer channel."));
-      break;
+      Wire.endTransmission();
+      return;
   }
   result = Wire.endTransmission();
   
+  // Multiplexer will return False if operation was successful
   if (result) {
     Serial.println(F("Failed to set multiplexer output channel."));
+    return;
   }
   
   // Set the AD7746 channel
   if (task.channelID == 1)
   {
-      sensor.writeCapSetupRegister(0b10000000);
+    sensor.writeCapSetupRegister(0b10000000);
   }
   else if (task.channelID == 2)
   {
-      sensor.writeCapSetupRegister(0b11000000);
+    sensor.writeCapSetupRegister(0b11000000);
+  }
+  else
+  {
+    Serial.println(F("Invalid channel ID."));
+    return;
   }
 
   // Now execute the correct task
@@ -111,6 +125,13 @@ void executeTask(struct Task task)
     readStatus(task);
     break;
 
+  case AS:
+    activateSensor(task);
+    break;
+  
+  case DS:
+    deactivateSensor(task);
+    break;
   // case RC:
   //   setOffset();
   //   break;
@@ -125,6 +146,17 @@ void executeTask(struct Task task)
   }
 }
 
+/* readCapacitance empties the readingsBuffer.  It pulls the readings one at
+a time and assembles the sensorID, channelID, value and timestamp from each
+reading into a string of 8-bit ASCII encoded values stored in the messageBuffer
+and ready to be sent over serial connection to the connected computer.
+
+Params
+    none
+
+Returns
+    void
+*/
 void readCapacitance()
 {
     struct sensorReading reading;
@@ -181,15 +213,26 @@ void readStatus(struct Task task)
     messageBuffer[4] = 59;  // ";" end character
 }
 
-// void Task::setOffset()
-// {
-//     ;
-// }
+void activateSensor(struct Task task)
+{
+  uint8_t sensorBit = 0b00000001;
+  sensorBit = sensorBit << ((task.sensorID-1)*2 + task.channelID - 1);
+  activeSensors = sensorBit | activeSensors;
+  Serial.print(F("Active sensor variable set to "));
+  Serial.print(activeSensors,BIN);
+  Serial.println(F("."));
+}
 
-// void Task::setOpMode()
-// {
-//     ;
-// }
+void deactivateSensor(struct Task task)
+{
+  uint8_t sensorBit = 0b00000001;
+  sensorBit = sensorBit << ((task.sensorID-1)*2 + task.channelID - 1);
+  sensorBit = ~sensorBit;
+  activeSensors = sensorBit & activeSensors;
+  Serial.print(F("Active sensor variable set to "));
+  Serial.print(activeSensors,BIN);
+  Serial.println(F("."));
+}
 
 void processSerialByte(uint8_t inByte)
 {
@@ -259,6 +302,14 @@ uint8_t parseCommand(const char message[10])
  {
    command = RV;
  }
+ else if ((charOne == 'A') && (charTwo == 'S'))
+ {
+   command = AS;
+ }
+ else if ((charOne == 'D') && (charTwo == 'S'))
+ {
+   command = DS;
+ }
  return command;
 }
 
@@ -310,6 +361,86 @@ void ASCIIConvert (uint32_t value,uint8_t *modified,int arraySize)
  }
 }
 
+void ISR_4()
+{
+  if (activeSensors & 0b01000000)
+  {
+    struct Task newTask;
+    newTask.taskID = RV;
+    newTask.sensorID = 4;
+    newTask.channelID = 1;
+    taskBuffer.add(newTask);
+  }
+  if (activeSensors & 0b10000000)
+  {
+    struct Task newTask;
+    newTask.taskID = RV;
+    newTask.sensorID = 4;
+    newTask.channelID = 2;
+    taskBuffer.add(newTask);
+  }
+}
+
+void ISR_3()
+{
+  if (activeSensors & 0b00010000)
+  {
+    struct Task newTask;
+    newTask.taskID = RV;
+    newTask.sensorID = 3;
+    newTask.channelID = 1;
+    taskBuffer.add(newTask);
+  }
+  if (activeSensors & 0b00100000)
+  {
+    struct Task newTask;
+    newTask.taskID = RV;
+    newTask.sensorID = 3;
+    newTask.channelID = 2;
+    taskBuffer.add(newTask);
+  }
+}
+
+void ISR_2()
+{
+  if (activeSensors & 0b00000100)
+  {
+    struct Task newTask;
+    newTask.taskID = RV;
+    newTask.sensorID = 2;
+    newTask.channelID = 1;
+    taskBuffer.add(newTask);
+  }
+  if (activeSensors & 0b00001000)
+  {
+    struct Task newTask;
+    newTask.taskID = RV;
+    newTask.sensorID = 2;
+    newTask.channelID = 2;
+    taskBuffer.add(newTask);
+  }
+}
+
+void ISR_1()
+{
+  if (activeSensors & 0b00000001)
+  {
+    struct Task newTask;
+    newTask.taskID = RV;
+    newTask.sensorID = 1;
+    newTask.channelID = 1;
+    taskBuffer.add(newTask);
+  }
+  if (activeSensors & 0b00000010)
+  {
+    struct Task newTask;
+    newTask.taskID = RV;
+    newTask.sensorID = 1;
+    newTask.channelID = 2;
+    taskBuffer.add(newTask);
+  }
+}
+
 void setup() {
   // initiate serial connections
   Serial.begin(9600);
@@ -327,7 +458,13 @@ void setup() {
   // set control registers
   sensor.writeExcSetupRegister(EXC_Setup);
   sensor.writeConfigurationRegister(Configuration);
-  // sensor.writeCapDacARegister(Cap_DAC_A);  
+  // sensor.writeCapDacARegister(Cap_DAC_A);
+
+  // interrupt stuff
+  attachInterrupt(4,ISR_4,FALLING);
+  attachInterrupt(5,ISR_3,FALLING);
+  attachInterrupt(6,ISR_2,FALLING);
+  attachInterrupt(7,ISR_1,FALLING);
 }
 
 void loop() {
