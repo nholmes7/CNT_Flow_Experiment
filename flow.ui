@@ -302,20 +302,14 @@
      <enum>Qt::RichText</enum>
     </property>
    </widget>
-   <widget class="QFrame" name="frame">
+   <widget class="PlotWidget" name="plotWidget" native="true">
     <property name="geometry">
      <rect>
       <x>430</x>
       <y>10</y>
-      <width>451</width>
-      <height>341</height>
+      <width>441</width>
+      <height>371</height>
      </rect>
-    </property>
-    <property name="frameShape">
-     <enum>QFrame::StyledPanel</enum>
-    </property>
-    <property name="frameShadow">
-     <enum>QFrame::Raised</enum>
     </property>
    </widget>
   </widget>
@@ -331,6 +325,14 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PlotWidget</class>
+   <extends>QWidget</extends>
+   <header>pyqtgraph</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
