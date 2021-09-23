@@ -14,7 +14,7 @@
 // Define default register values
 #define Cap_Setup_1     0b10000000
 #define Cap_Setup_2     0b11000000
-#define EXC_Setup       0b00000111
+#define EXC_Setup       0b00001011
 #define Configuration   0b11000001
 #define Cap_DAC_A       0b00011100
 #define Cap_Offset_H    0x80
@@ -48,7 +48,7 @@ struct Task
 };
 
 // Define buffers and stuff
-RingBufCPP<struct sensorReading,5> readingsBuffer;
+RingBufCPP<struct sensorReading,100> readingsBuffer;
 RingBufCPP<struct Task,20> taskBuffer;
 uint8_t messageBuffer[200];
 
@@ -221,7 +221,7 @@ void activateSensor(struct Task task)
   // Serial.print(F("Active sensor variable set to "));
   Serial.print(F("#AS"));
   Serial.print(activeSensors,BIN);
-  Serial.println(F(";"));
+  Serial.print(F(";"));
 }
 
 void deactivateSensor(struct Task task)
@@ -233,7 +233,7 @@ void deactivateSensor(struct Task task)
   // Serial.print(F("Active sensor variable set to "));
   Serial.print(F("#AS"));
   Serial.print(activeSensors,BIN);
-  Serial.println(F(";"));
+  Serial.print(F(";"));
 }
 
 void processSerialByte(uint8_t inByte)
@@ -457,16 +457,32 @@ void setup() {
   digitalWrite(address_1,LOW);
   digitalWrite(address_2,LOW);
 
-  // set control registers
-  sensor.writeExcSetupRegister(EXC_Setup);
-  sensor.writeConfigurationRegister(Configuration);
+  // AD7746 setup
+  uint8_t result;
+  for (int i=0;i<4;i++)
+  {
+    Wire.beginTransmission(multiplexer_addr);
+    Wire.write(0b00010000 << i);
+    result = Wire.endTransmission();
+  
+    // Multiplexer will return False if operation was successful
+    if (result) {
+      Serial.println(F("Failed to set multiplexer output channel."));
+      return;
+    }
+
+    // enable continuous conversion on all AD7746 devices
+    sensor.writeConfigurationRegister(Configuration);
+    // set control registers
+    sensor.writeExcSetupRegister(EXC_Setup);
+  }
   // sensor.writeCapDacARegister(Cap_DAC_A);
 
   // interrupt stuff
-  attachInterrupt(4,ISR_4,FALLING);
-  attachInterrupt(5,ISR_3,FALLING);
-  attachInterrupt(6,ISR_2,FALLING);
-  attachInterrupt(7,ISR_1,FALLING);
+   attachInterrupt(4,ISR_4,FALLING);
+   attachInterrupt(5,ISR_3,FALLING);
+   attachInterrupt(6,ISR_2,FALLING);
+   attachInterrupt(7,ISR_1,FALLING);
 }
 
 void loop() {
