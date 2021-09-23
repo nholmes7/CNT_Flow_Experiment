@@ -19,6 +19,11 @@ class Sensor:
         status 0 indicates sensor is disabled
         status 1 indicates sensor is polling
         status 2 indicates sensor is polling and recording
+    chip: int
+        the index for the sensor/AD7746 device the individual sensor is
+        connected to - corresponds with the GUI numbering
+    channel: int
+        which AD7746 channel the sensor is connnected to
     values: list of ints
         a list of the values read from the sensor - used like a circular buffer
     timestamps: list of ints
@@ -111,10 +116,10 @@ class flowControl(QtWidgets.QMainWindow):
             return
         # if we do in fact have data, we can proceed with parsing
         reply = reply.decode('ascii',errors = 'ignore')
-        self.ParseReply(reply)
+        self.ParseValues(reply)
         self.UpdatePlots()
 
-    def ParseReply(self,reply):
+    def ParseValues(self,reply):
         reply = reply[1:-1]
         for i in range(len(reply)/16):
             reading = reply[(i-1)*8,i*8]
@@ -125,15 +130,19 @@ class flowControl(QtWidgets.QMainWindow):
             ID = (sensor-1)*2 + (channel-1)
             self.sensors[ID].values.append(value)
             self.sensors[ID].timestamps.append(timestamp)
+            # chop off excess data so that list behaves like a circular buffer
+            # and doesn't grow huge in a hurry
             if len(self.sensors[ID].values) > 100:
                 self.sensors[ID].timestamps = self.sensors[ID].timestamps[-100:]
                 self.sensors[ID].values = self.sensors[ID].values[-100:]
     
     def UpdatePlots(self):
-        pass
+        for ID in self.lines:
+            self.lines[ID].setData(self.sensors[ID].timestamps,self.sensors[ID].values)
 
 
     def ToggleStatus(self,button,ID):
+        # deal with colour coding of GUI elements first
         if self.sensors[ID].status == 0:
             self.sensors[ID].status = 1
             button.setStyleSheet(self.statii['polling'])
@@ -143,7 +152,38 @@ class flowControl(QtWidgets.QMainWindow):
         elif self.sensors[ID].status == 2:
             self.sensors[ID].status = 0
             button.setStyleSheet(self.statii['disabled'])
+        # reset plot elements
         self.ResetPlot()
+        # notify Teensy which sensor to activate or deactivate
+        if self.sensors[ID].status == 0:
+            self.ActivateSensor(ID,0)
+        elif self.sensors[ID].status == 1:
+            self.ActivateSensor(ID,1)
+
+    def ActivateSensor(self,ID,direction):
+        if direction == 0:
+            command = '#DS' + str(self.sensors[ID].chip) + str(self.sensors[ID].channel) + ';'
+        elif direction == 1:
+            command = '#AS' + str(self.sensors[ID].chip) + str(self.sensors[ID].channel) + ';'
+        command = bytes(command,'ascii')
+        ser.write(command)
+        reply = ser.read_until(expected=bytes(';','ascii'))
+        reply = reply.decode('ascii',errors = 'ignore')
+        # compare record of active sensors returned by the teensy with record
+        # of active sensors stored in the python program to check for errors
+        self.VerifyActiveSensors(reply)
+
+    def VerifyActiveSensors(self,reply):
+        reply = reply[1:-1]
+        teensy_active = int(reply)
+        gui_active = 0
+        for ID in self.sensors:
+            if self.sensors[ID].status > 0:
+                gui_active += pow(2,ID)
+        if teensy_active != gui_active:
+            raise Warning("Active sensor error!  Microcontroller and GUI not \
+                in agreement.")
+        return
 
     def ResetPlot(self):
         # Clear the graph and re-plot

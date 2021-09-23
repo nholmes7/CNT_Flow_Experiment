@@ -218,9 +218,10 @@ void activateSensor(struct Task task)
   uint8_t sensorBit = 0b00000001;
   sensorBit = sensorBit << ((task.sensorID-1)*2 + task.channelID - 1);
   activeSensors = sensorBit | activeSensors;
-  Serial.print(F("Active sensor variable set to "));
+  // Serial.print(F("Active sensor variable set to "));
+  Serial.print(F("#AS"));
   Serial.print(activeSensors,BIN);
-  Serial.println(F("."));
+  Serial.println(F(";"));
 }
 
 void deactivateSensor(struct Task task)
@@ -229,9 +230,10 @@ void deactivateSensor(struct Task task)
   sensorBit = sensorBit << ((task.sensorID-1)*2 + task.channelID - 1);
   sensorBit = ~sensorBit;
   activeSensors = sensorBit & activeSensors;
-  Serial.print(F("Active sensor variable set to "));
+  // Serial.print(F("Active sensor variable set to "));
+  Serial.print(F("#AS"));
   Serial.print(activeSensors,BIN);
-  Serial.println(F("."));
+  Serial.println(F(";"));
 }
 
 void processSerialByte(uint8_t inByte)
@@ -443,7 +445,7 @@ void ISR_1()
 
 void setup() {
   // initiate serial connections
-  Serial.begin(9600);
+  Serial.begin(115200);
   Wire.begin();
   delay(250);
   
