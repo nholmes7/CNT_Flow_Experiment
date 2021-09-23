@@ -50,7 +50,7 @@ struct Task
 // Define buffers and stuff
 RingBufCPP<struct sensorReading,100> readingsBuffer;
 RingBufCPP<struct Task,20> taskBuffer;
-uint8_t messageBuffer[200];
+uint8_t messageBuffer[100*20];
 
 struct Task currentTask;
 bool busFree = true;
