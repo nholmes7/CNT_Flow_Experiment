@@ -2,7 +2,7 @@ from gui import Ui_MainWindow
 from PyQt5 import QtCore, QtWidgets, QtGui
 import serial, pyqtgraph
 
-# ser = serial.Serial(port='/dev/ttyUSB0',baudrate=115200,timeout=3)
+ser = serial.Serial(port='/dev/ttyACM0',baudrate=115200,timeout=3)
 
 class Sensor:
     '''
@@ -100,33 +100,51 @@ class flowControl(QtWidgets.QMainWindow):
         self.ui.s4c1_button.clicked.connect(lambda: self.ToggleStatus(self.ui.s4c1_button,6))
         self.ui.s4c2_button.clicked.connect(lambda: self.ToggleStatus(self.ui.s4c2_button,7))
 
-        # # Main loop timer used for sensor polling
-        # self.loop_timer = QtCore.QTimer()
-        # self.loop_timer.setInterval(250)
-        # self.loop_timer.timeout.connect(self.PollSensors)
-        # self.loop_timer.start()
+        # check the connection and status of each sensor
+        self.StartupConnectivityCheck()
+        self.StartupConnectivityCheck()
+        
+        # Main loop timer used for sensor polling
+        self.loop_timer = QtCore.QTimer()
+        self.loop_timer.setInterval(250)
+        self.loop_timer.timeout.connect(self.PollSensors)
+        self.loop_timer.start()
+
+    def StartupConnectivityCheck(self):
+        for ID in self.sensors:
+            command = '#RS' + str(self.sensors[ID].chip) + str(self.sensors[ID].channel)+ ';'
+            command = bytes(command,'ascii')
+            print('Sending status check: ' + command.decode('ascii'))
+            ser.write(command)
+            reply = ser.read_until(expected=bytes(';','ascii'))
+            reply = reply.decode('ascii',errors = 'ignore')
+            print('Received: ' + reply)
+            
 
     def PollSensors(self):
         command = bytes('#RC;','ascii')
+        print('Sending poll command: ' + command.decode('ascii'))
         ser.write(command)
         reply = ser.read_until(expected=bytes(';','ascii'))
+        reply = reply.decode('ascii',errors = 'ignore')
+        print('Received: ' + reply)
         # check to see if reply is simply "#;" which is the case if no sensors
         # are enabled
         if len(reply) == 2:
             return
         # if we do in fact have data, we can proceed with parsing
-        reply = reply.decode('ascii',errors = 'ignore')
         self.ParseValues(reply)
         self.UpdatePlots()
 
     def ParseValues(self,reply):
         reply = reply[1:-1]
-        for i in range(len(reply)/16):
-            reading = reply[(i-1)*8,i*8]
+        for i in range(int(len(reply)/16)):
+            reading = reply[i*16:(i+1)*16]
+            # print('Parsed reading: ' + reading)
             sensor = int(reading[0])
             channel = int(reading[1])
-            value = int(reading[2:8])
-            timestamp = int(reading[8:])
+            value = int(reading[2:8],base=16)
+            timestamp = int(reading[8:],base=16)
             ID = (sensor-1)*2 + (channel-1)
             self.sensors[ID].values.append(value)
             self.sensors[ID].timestamps.append(timestamp)
@@ -166,16 +184,18 @@ class flowControl(QtWidgets.QMainWindow):
         elif direction == 1:
             command = '#AS' + str(self.sensors[ID].chip) + str(self.sensors[ID].channel) + ';'
         command = bytes(command,'ascii')
+        print('Sending activate command: ' + command.decode('ascii'))
         ser.write(command)
         reply = ser.read_until(expected=bytes(';','ascii'))
         reply = reply.decode('ascii',errors = 'ignore')
+        print('Received: ' + reply)
         # compare record of active sensors returned by the teensy with record
         # of active sensors stored in the python program to check for errors
         self.VerifyActiveSensors(reply)
 
     def VerifyActiveSensors(self,reply):
         reply = reply[1:-1]
-        teensy_active = int(reply)
+        teensy_active = int(reply[2:],base=2)
         gui_active = 0
         for ID in self.sensors:
             if self.sensors[ID].status > 0:
