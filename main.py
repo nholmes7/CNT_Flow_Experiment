@@ -106,7 +106,7 @@ class flowControl(QtWidgets.QMainWindow):
         
         # Main loop timer used for sensor polling
         self.loop_timer = QtCore.QTimer()
-        self.loop_timer.setInterval(250)
+        self.loop_timer.setInterval(100)
         self.loop_timer.timeout.connect(self.PollSensors)
         self.loop_timer.start()
 
@@ -136,6 +136,11 @@ class flowControl(QtWidgets.QMainWindow):
         self.ParseValues(reply)
         self.UpdatePlots()
 
+    def UpdateLogFile(self,sensor,channel,timestamp,value):
+        with open('data_log','a') as file:
+            line = str(sensor) + ',' + str(channel) + ',' + str(timestamp) + ',' + str(value) + '\n'
+            file.writelines(line)
+
     def ParseValues(self,reply):
         reply = reply[1:-1]
         for i in range(int(len(reply)/16)):
@@ -153,6 +158,8 @@ class flowControl(QtWidgets.QMainWindow):
             if len(self.sensors[ID].values) > 100:
                 self.sensors[ID].timestamps = self.sensors[ID].timestamps[-100:]
                 self.sensors[ID].values = self.sensors[ID].values[-100:]
+            
+            self.UpdateLogFile(sensor,channel,timestamp,value)
     
     def UpdatePlots(self):
         for ID in self.lines:
