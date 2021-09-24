@@ -174,7 +174,7 @@ class flowControl(QtWidgets.QMainWindow):
 
     def UpdatePressureLog(self,ID,pressure,timestamp):
         with open('data_log','a') as file:
-            line = '10,' + str(ID) + ',' + str(timestamp) + ',' + str(pressure) + '\n'
+            line = '9,' + str(ID) + ',' + str(timestamp) + ',' + str(pressure) + '\n'
             file.writelines(line)
     
     def UpdateLogFile(self,sensor,channel,timestamp,value):
