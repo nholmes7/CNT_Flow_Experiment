@@ -1,8 +1,10 @@
 from gui import Ui_MainWindow
 from PyQt5 import QtCore, QtWidgets, QtGui
-import serial, pyqtgraph
+import serial, pyqtgraph,time
 
 ser = serial.Serial(port='/dev/ttyACM0',baudrate=115200,timeout=3)
+serP0 = serial.Serial(port='/dev/ttyUSB0',baudrate=115200,timeout=3)
+serP1 = serial.Serial(port='/dev/ttyUSB1',baudrate=115200,timeout=3)
 
 class Sensor:
     '''
@@ -90,6 +92,9 @@ class flowControl(QtWidgets.QMainWindow):
         self.sensors = {}
         for i in range(8):
             self.sensors[i] = Sensor(i)
+
+        self.pressure_1 = {'value':0,'timestamp':0}
+        self.pressure_2 = {'value':0,'timestamp':0}
         
         self.ui.s1c1_button.clicked.connect(lambda: self.ToggleStatus(self.ui.s1c1_button,0))
         self.ui.s1c2_button.clicked.connect(lambda: self.ToggleStatus(self.ui.s1c2_button,1))
@@ -122,6 +127,12 @@ class flowControl(QtWidgets.QMainWindow):
             
 
     def PollSensors(self):
+        self.PollPressure(1)
+        self.PollPressure(2)
+        self.PollFlow()
+        self.UpdatePlots()
+
+    def PollFlow(self):
         command = bytes('#RC;','ascii')
         print('Sending poll command: ' + command.decode('ascii'))
         ser.write(command)
@@ -133,15 +144,45 @@ class flowControl(QtWidgets.QMainWindow):
         if len(reply) == 2:
             return
         # if we do in fact have data, we can proceed with parsing
-        self.ParseValues(reply)
-        self.UpdatePlots()
+        self.ParseFlowValues(reply)
 
+    def PollPressure(self,ID):
+        command = bytes('P\r','ascii')
+        print('Pressure poll command: ' + command.decode('ascii'))
+        trans = {
+            1:serP0,
+            2:serP1
+        }
+        serP = trans[ID]
+        serP.write(command)
+        reply = serP.read_until(expected=bytes('>','ascii'))
+        reply = reply.decode('ascii',errors = 'ignore')
+        print('Received: ' + reply)
+        self.ParsePressure(reply,ID)
+
+    def ParsePressure(self,reply,ID):
+        pressure = reply.split(' ')
+        pressure = float(pressure[0])
+        timestamp = time.time()
+        pressure_sensor = {
+            1:self.pressure_1,
+            2:self.pressure_2
+        }
+        pressure_sensor[ID]['value'] = pressure*6894.76         # convert to Pa
+        pressure_sensor[ID]['timestamp'] = timestamp
+        self.UpdatePressureLog(ID,pressure,timestamp)
+
+    def UpdatePressureLog(self,ID,pressure,timestamp):
+        with open('data_log','a') as file:
+            line = '10,' + str(ID) + ',' + str(timestamp) + ',' + str(pressure) + '\n'
+            file.writelines(line)
+    
     def UpdateLogFile(self,sensor,channel,timestamp,value):
         with open('data_log','a') as file:
             line = str(sensor) + ',' + str(channel) + ',' + str(timestamp) + ',' + str(value) + '\n'
             file.writelines(line)
 
-    def ParseValues(self,reply):
+    def ParseFlowValues(self,reply):
         reply = reply[1:-1]
         for i in range(int(len(reply)/16)):
             reading = reply[i*16:(i+1)*16]
@@ -164,6 +205,7 @@ class flowControl(QtWidgets.QMainWindow):
     def UpdatePlots(self):
         for ID in self.lines:
             self.lines[ID].setData(self.sensors[ID].timestamps,self.sensors[ID].values)
+        self.ui.progressBar.setProperty('value',self.pressure_1['value'])
 
 
     def ToggleStatus(self,button,ID):
