@@ -1,10 +1,23 @@
+from serial.serialutil import SerialException
 from gui import Ui_MainWindow
 from PyQt5 import QtCore, QtWidgets, QtGui
 import serial, pyqtgraph,time
 
-ser = serial.Serial(port='/dev/ttyACM0',baudrate=115200,timeout=3)
-serP0 = serial.Serial(port='/dev/ttyUSB0',baudrate=115200,timeout=3)
-serP1 = serial.Serial(port='/dev/ttyUSB1',baudrate=115200,timeout=3)
+try:
+    ser = serial.Serial(port='/dev/ttyACM0',baudrate=115200,timeout=3)
+    flowmeter_connected_flag = True
+except SerialException:
+    flowmeter_connected_flag = False
+try:
+    serP0 = serial.Serial(port='/dev/ttyUSB0',baudrate=115200,timeout=3)
+    P0_connected_flag = True
+except SerialException:
+    P0_connected_flag = False
+try:
+    serP1 = serial.Serial(port='/dev/ttyUSB1',baudrate=115200,timeout=3)
+    P1_connected_flag = True
+except SerialException:
+    P1_connected_flag = False
 
 class Sensor:
     '''
@@ -31,10 +44,6 @@ class Sensor:
     timestamps: list of ints
         a list of the timestamps corresponding to the values read from the
         sensor - used like a circular buffer
-
-    Public Methods
-    --------------
-    QueryFlow()
     '''
 
     def __init__(self,ID) -> None:
@@ -106,8 +115,9 @@ class flowControl(QtWidgets.QMainWindow):
         self.ui.s4c2_button.clicked.connect(lambda: self.ToggleStatus(self.ui.s4c2_button,7))
 
         # check the connection and status of each sensor
-        self.StartupConnectivityCheck()
-        self.StartupConnectivityCheck()
+        if flowmeter_connected_flag:
+            self.StartupConnectivityCheck()
+            self.StartupConnectivityCheck()
         
         # Main loop timer used for sensor polling
         self.loop_timer = QtCore.QTimer()
@@ -127,9 +137,12 @@ class flowControl(QtWidgets.QMainWindow):
             
 
     def PollSensors(self):
-        self.PollPressure(1)
-        self.PollPressure(2)
-        self.PollFlow()
+        if P0_connected_flag:
+            self.PollPressure(1)
+        if P1_connected_flag:
+            self.PollPressure(2)
+        if flowmeter_connected_flag:
+            self.PollFlow()
         self.UpdatePlots()
 
     def PollFlow(self):
@@ -174,7 +187,7 @@ class flowControl(QtWidgets.QMainWindow):
 
     def UpdatePressureLog(self,ID,pressure,timestamp):
         with open('data_log','a') as file:
-            line = '9,' + str(ID) + ',' + str(timestamp) + ',' + str(pressure) + '\n'
+            line = '9,' + str(ID) + ',' + str(timestamp) + ',' + str(pressure*6894.76) + '\n'
             file.writelines(line)
     
     def UpdateLogFile(self,sensor,channel,timestamp,value):
@@ -222,10 +235,11 @@ class flowControl(QtWidgets.QMainWindow):
         # reset plot elements
         self.ResetPlot()
         # notify Teensy which sensor to activate or deactivate
-        if self.sensors[ID].status == 0:
-            self.ActivateSensor(ID,0)
-        elif self.sensors[ID].status == 1:
-            self.ActivateSensor(ID,1)
+        if flowmeter_connected_flag:
+            if self.sensors[ID].status == 0:
+                self.ActivateSensor(ID,0)
+            elif self.sensors[ID].status == 1:
+                self.ActivateSensor(ID,1)
 
     def ActivateSensor(self,ID,direction):
         if direction == 0:
