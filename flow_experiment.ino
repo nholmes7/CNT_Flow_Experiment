@@ -5,13 +5,13 @@
 #include <avr/interrupt.h>
 // #include <Task.h>
 
+// multiplexer addressing constants
+#define address_0 12           // pin address for multiplexer address 0 pin
+#define address_1 11           // pin address for multiplexer address 1 pin
+#define address_2 10           // pin address for multiplexer address 2 pin
+#define multiplexer_addr 0x70  // I2C address
 
-#define address_0 12           // pin address for multiplexer address 0
-#define address_1 11           // pin address for multiplexer address 1
-#define address_2 10           // pin address for multiplexer address 2
-#define multiplexer_addr 0x70
-
-// Define default register values
+// Define default AD7746 register values
 #define Cap_Setup_1     0b10000000
 #define Cap_Setup_2     0b11000000
 #define EXC_Setup       0b00001011
@@ -47,18 +47,24 @@ struct Task
   uint8_t taskID;
 };
 
-// Define buffers and stuff
+// Define buffers and related variables
 RingBufCPP<struct sensorReading,100> readingsBuffer;
 RingBufCPP<struct Task,20> taskBuffer;
 uint8_t messageBuffer[100*20];
-
 struct Task currentTask;
+
+// Other miscellaneous global variables
 bool busFree = true;
 volatile uint8_t interruptFlag = 0;
 uint8_t activeSensors = 0b00000000;
-// initialize sensor objects
+
+// initialize sensor object
 AD7746 sensor;
 
+/* executeTask decides how to execute a task based on the taskID attribute.
+This high-level function routes the task to the correct AD7746 chip and
+channel based on the sensorID and channelID attributes.
+*/
 void executeTask(struct Task task)
 {
   // Reading the capacitance empties the readingsBuffer and does not require 
@@ -146,16 +152,11 @@ void executeTask(struct Task task)
   }
 }
 
-/* readCapacitance empties the readingsBuffer.  It pulls the readings one at
-a time and assembles the sensorID, channelID, value and timestamp from each
-reading into a string of 8-bit ASCII encoded values stored in the messageBuffer
-and ready to be sent over serial connection to the connected computer.
-
-Params
-    none
-
-Returns
-    void
+/* readCapacitance empties the readingsBuffer into the messageBuffer.  It pulls 
+the readings one at a time and assembles the sensorID, channelID, value and 
+timestamp from each reading into a string of 8-bit ASCII encoded values stored 
+in the messageBuffer and ready to be sent over serial connection to the 
+connected computer.
 */
 void readCapacitance()
 {
@@ -183,6 +184,10 @@ void readCapacitance()
     messageBuffer[i] = 59;  // ";" end character
 }
 
+/* readValue reads the capacitance value from the AD7746 chip, and stores the
+value as a sensorReading object in the readingsBuffer along with information
+about the sensor and timestamp.
+*/
 void readValue(struct Task task)
 {
     uint32_t reportedCap;
@@ -200,6 +205,10 @@ void readValue(struct Task task)
     readingsBuffer.add(currentReading);
 }
 
+/* readStatus reads the status register from the AD7746 IC.  It formats the
+returned value along with the sensor ID as an ASCII string which is added to
+the messageBuffer.
+*/
 void readStatus(struct Task task)
 {
     uint8_t reportedStatus;
@@ -213,6 +222,9 @@ void readStatus(struct Task task)
     messageBuffer[4] = 59;  // ";" end character
 }
 
+/* activateSensor updates the activeSensors registers based on which sensor
+you are trying to activate. 
+*/
 void activateSensor(struct Task task)
 {
   uint8_t sensorBit = 0b00000001;
