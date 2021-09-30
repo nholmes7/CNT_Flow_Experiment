@@ -106,18 +106,23 @@ void executeTask(struct Task task)
   }
   
   // Set the AD7746 channel
+  bool success = false;
   if (task.channelID == 1)
   {
-    sensor.writeCapSetupRegister(0b10000000);
+    success = sensor.writeCapSetupRegister(0b10000000);
   }
   else if (task.channelID == 2)
   {
-    sensor.writeCapSetupRegister(0b11000000);
+    success = sensor.writeCapSetupRegister(0b11000000);
   }
   else
   {
     Serial.println(F("Invalid channel ID."));
     return;
+  }
+  if (!success)
+  {
+    Serial.println(F("Channel change was unsuccessful!"));
   }
 
   // Now execute the correct task
