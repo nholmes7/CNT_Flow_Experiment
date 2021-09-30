@@ -161,12 +161,6 @@ connected computer.
 void readCapacitance()
 {
     struct sensorReading reading;
-    // uint16_t bufferSize = readingsBuffer.size();
-    // A message consists of a start and end character, with 6 HEX
-    // characters representing the value of the capacitance, plus 
-    // 2 extra characters for the channel and sensor IDs.
-    // uint16_t messageSize = (6+2)*bufferSize + 2;
-    // uint8_t message[messageSize];
     messageBuffer[0] = 35;  // "#" start character
 
     int i = 1;

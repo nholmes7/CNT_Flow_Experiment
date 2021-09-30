@@ -3,6 +3,7 @@ from gui import Ui_MainWindow
 from PyQt5 import QtCore, QtWidgets, QtGui
 import serial, pyqtgraph,time
 
+# set up the serial ports - set flags to indicate which devices are connected
 try:
     ser = serial.Serial(port='/dev/ttyACM0',baudrate=115200,timeout=3)
     flowmeter_connected_flag = True
@@ -138,9 +139,9 @@ class flowControl(QtWidgets.QMainWindow):
 
     def PollSensors(self):
         if P0_connected_flag:
-            self.PollPressure(1)
+            self.PollPressure(1,serP0)
         if P1_connected_flag:
-            self.PollPressure(2)
+            self.PollPressure(2,serP1)
         if flowmeter_connected_flag:
             self.PollFlow()
         self.UpdatePlots()
@@ -159,14 +160,9 @@ class flowControl(QtWidgets.QMainWindow):
         # if we do in fact have data, we can proceed with parsing
         self.ParseFlowValues(reply)
 
-    def PollPressure(self,ID):
+    def PollPressure(self,ID,serP):
         command = bytes('P\r','ascii')
         print('Pressure poll command: ' + command.decode('ascii'))
-        trans = {
-            1:serP0,
-            2:serP1
-        }
-        serP = trans[ID]
         serP.write(command)
         reply = serP.read_until(expected=bytes('>','ascii'))
         reply = reply.decode('ascii',errors = 'ignore')
