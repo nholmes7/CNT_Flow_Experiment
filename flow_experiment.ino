@@ -432,14 +432,10 @@ void createReadValueTask(uint8_t sensorID,uint8_t channelID,uint8_t nextChannelI
 
 void pollDecisions(uint8_t device, uint8_t nextPollChannel)
 {
-  
-}
-
-void ISR_4()
-{
-  bool channelOneActive = activeSensors & 0b01000000;
-  bool channelTwoActive = activeSensors & 0b10000000;
-  static uint8_t nextPollChannel = 0;
+  uint8_t channelOne = 0b00000001 << (2*device);
+  uint8_t channelTwo = channelOne << 1;
+  bool channelOneActive = activeSensors & channelOne;
+  bool channelTwoActive = activeSensors & channelTwo;
 
   if (channelOneActive && channelTwoActive)
   {
@@ -481,66 +477,32 @@ void ISR_4()
       createReadValueTask(4,2,nextPollChannel,false);
     }
   }
+
+  return nextPollChannel;
+}
+
+void ISR_4()
+{
+  static uint8_t nextPollChannel = 0;
+  nextPollChannel = pollDecisions(4,nextPollChannel)
 }
 
 void ISR_3()
 {
-  if (activeSensors & 0b00010000)
-  {
-    struct Task newTask;
-    newTask.taskID = RV;
-    newTask.sensorID = 3;
-    newTask.channelID = 1;
-    taskBuffer.add(newTask);
-  }
-  if (activeSensors & 0b00100000)
-  {
-    struct Task newTask;
-    newTask.taskID = RV;
-    newTask.sensorID = 3;
-    newTask.channelID = 2;
-    taskBuffer.add(newTask);
-  }
+  static uint8_t nextPollChannel = 0;
+  nextPollChannel = pollDecisions(3,nextPollChannel)
 }
 
 void ISR_2()
 {
-  if (activeSensors & 0b00000100)
-  {
-    struct Task newTask;
-    newTask.taskID = RV;
-    newTask.sensorID = 2;
-    newTask.channelID = 1;
-    taskBuffer.add(newTask);
-  }
-  if (activeSensors & 0b00001000)
-  {
-    struct Task newTask;
-    newTask.taskID = RV;
-    newTask.sensorID = 2;
-    newTask.channelID = 2;
-    taskBuffer.add(newTask);
-  }
+  static uint8_t nextPollChannel = 0;
+  nextPollChannel = pollDecisions(2,nextPollChannel)
 }
 
 void ISR_1()
 {
-  if (activeSensors & 0b00000001)
-  {
-    struct Task newTask;
-    newTask.taskID = RV;
-    newTask.sensorID = 1;
-    newTask.channelID = 1;
-    taskBuffer.add(newTask);
-  }
-  if (activeSensors & 0b00000010)
-  {
-    struct Task newTask;
-    newTask.taskID = RV;
-    newTask.sensorID = 1;
-    newTask.channelID = 2;
-    taskBuffer.add(newTask);
-  }
+  static uint8_t nextPollChannel = 0;
+  nextPollChannel = pollDecisions(1,nextPollChannel)
 }
 
 void setup() {
