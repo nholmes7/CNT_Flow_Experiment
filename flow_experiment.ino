@@ -437,17 +437,19 @@ uint8_t pollDecisions(uint8_t device, uint8_t nextPollChannel)
   bool channelOneActive = activeSensors & channelOne;
   bool channelTwoActive = activeSensors & channelTwo;
 
+  device++;
+
   if (channelOneActive && channelTwoActive)
   {
     if (nextPollChannel == 1)
     {
       nextPollChannel = 2;
-      createReadValueTask(4,1,nextPollChannel,false);
+      createReadValueTask(device,1,nextPollChannel,false);
     }
     else if (nextPollChannel == 2)
     {
       nextPollChannel = 1;
-      createReadValueTask(4,2,nextPollChannel,false);
+      createReadValueTask(device,2,nextPollChannel,false);
     }
   }
 
@@ -455,11 +457,11 @@ uint8_t pollDecisions(uint8_t device, uint8_t nextPollChannel)
   {
     if (nextPollChannel == 0)
     {
-      createReadValueTask(4,1,1,true);
+      createReadValueTask(device,1,1,true);
     }
     else
     {
-      createReadValueTask(4,1,1,false);
+      createReadValueTask(device,1,1,false);
     }
     nextPollChannel = 1;
   }
@@ -468,11 +470,11 @@ uint8_t pollDecisions(uint8_t device, uint8_t nextPollChannel)
   {
     if (nextPollChannel == 0)
     {
-      createReadValueTask(4,2,2,true);
+      createReadValueTask(device,2,2,true);
     }
     else
     {
-      createReadValueTask(4,2,2,false);
+      createReadValueTask(device,2,2,false);
     }
     nextPollChannel = 2;
   }
