@@ -15,7 +15,7 @@
 #define Cap_Setup_1     0b10000000
 #define Cap_Setup_2     0b11000000
 #define EXC_Setup       0b00001011
-#define Configuration   0b11000001
+#define Configuration   0b11111001
 #define Cap_DAC_A       0b00011100
 #define Cap_Offset_H    0x80
 #define Cap_Offset_L    0x00
@@ -419,6 +419,7 @@ void ASCIIConvert (uint32_t value,uint8_t *modified,int arraySize)
  }
 }
 
+/*Creates a new readValue task and adds it to the taskBuffer.*/
 void createReadValueTask(uint8_t sensorID,uint8_t channelID,uint8_t nextChannelID,bool setChannel)
 {
   struct Task newTask;
@@ -430,6 +431,12 @@ void createReadValueTask(uint8_t sensorID,uint8_t channelID,uint8_t nextChannelI
   taskBuffer.add(newTask);
 }
 
+/* pollDecisions hosts the generic logic for deciding how to set up the readValue
+task whenever an ISR is triggered.  If both channels on an AD7746 chip are active,
+pollDecisions flips which channel is read on each AD7746 data available cycle.
+pollDecisions ultimately hands off the creation of the readValue task to the 
+createReadValueTask function.
+*/
 uint8_t pollDecisions(uint8_t device, uint8_t nextPollChannel)
 {
   uint8_t channelOne = 0b00000001 << (2*device);
