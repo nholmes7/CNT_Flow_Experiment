@@ -122,7 +122,7 @@ bool changeMultiplexerAddress(uint8_t sensorID)
   // Change multiplexer to address the correct device
   bool success;
   Wire.beginTransmission(multiplexer_addr);
-  switch (task.sensorID)
+  switch (sensorID)
   {
   case 1:
       Wire.write(0b00010000);
@@ -426,8 +426,13 @@ void createReadValueTask(uint8_t sensorID,uint8_t channelID,uint8_t nextChannelI
   newTask.sensorID = sensorID;
   newTask.channelID = channelID;
   newTask.nextChannelID = nextChannelID;
-  newTask.setChannel = setChannel
+  newTask.setChannel = setChannel;
   taskBuffer.add(newTask);
+}
+
+void pollDecisions(uint8_t device, uint8_t nextPollChannel)
+{
+  
 }
 
 void ISR_4()
@@ -456,8 +461,12 @@ void ISR_4()
     {
       createReadValueTask(4,1,1,true);
     }
-    nextPollChannel = 1;
-    createReadValueTask(4,1,nextPollChannel,false);
+    else
+    {
+      nextPollChannel = 1;
+      createReadValueTask(4,1,nextPollChannel,false);
+    }
+    
   }
 
   else if (channelTwoActive)
@@ -466,8 +475,11 @@ void ISR_4()
     {
       createReadValueTask(4,2,2,true);
     }
-    nextPollChannel = 2;
-    createReadValueTask(4,2,nextPollChannel,false);
+    else
+    {
+      nextPollChannel = 2;
+      createReadValueTask(4,2,nextPollChannel,false);
+    }
   }
 }
 
