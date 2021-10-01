@@ -484,25 +484,25 @@ uint8_t pollDecisions(uint8_t device, uint8_t nextPollChannel)
 void ISR_4()
 {
   static uint8_t nextPollChannel = 0;
-  nextPollChannel = pollDecisions(4,nextPollChannel);
+  nextPollChannel = pollDecisions(3,nextPollChannel);
 }
 
 void ISR_3()
 {
   static uint8_t nextPollChannel = 0;
-  nextPollChannel = pollDecisions(3,nextPollChannel);
+  nextPollChannel = pollDecisions(2,nextPollChannel);
 }
 
 void ISR_2()
 {
   static uint8_t nextPollChannel = 0;
-  nextPollChannel = pollDecisions(2,nextPollChannel);
+  nextPollChannel = pollDecisions(1,nextPollChannel);
 }
 
 void ISR_1()
 {
   static uint8_t nextPollChannel = 0;
-  nextPollChannel = pollDecisions(1,nextPollChannel);
+  nextPollChannel = pollDecisions(0,nextPollChannel);
 }
 
 void setup() {
