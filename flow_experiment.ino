@@ -430,7 +430,7 @@ void createReadValueTask(uint8_t sensorID,uint8_t channelID,uint8_t nextChannelI
   taskBuffer.add(newTask);
 }
 
-void pollDecisions(uint8_t device, uint8_t nextPollChannel)
+uint8_t pollDecisions(uint8_t device, uint8_t nextPollChannel)
 {
   uint8_t channelOne = 0b00000001 << (2*device);
   uint8_t channelTwo = channelOne << 1;
@@ -484,25 +484,25 @@ void pollDecisions(uint8_t device, uint8_t nextPollChannel)
 void ISR_4()
 {
   static uint8_t nextPollChannel = 0;
-  nextPollChannel = pollDecisions(4,nextPollChannel)
+  nextPollChannel = pollDecisions(4,nextPollChannel);
 }
 
 void ISR_3()
 {
   static uint8_t nextPollChannel = 0;
-  nextPollChannel = pollDecisions(3,nextPollChannel)
+  nextPollChannel = pollDecisions(3,nextPollChannel);
 }
 
 void ISR_2()
 {
   static uint8_t nextPollChannel = 0;
-  nextPollChannel = pollDecisions(2,nextPollChannel)
+  nextPollChannel = pollDecisions(2,nextPollChannel);
 }
 
 void ISR_1()
 {
   static uint8_t nextPollChannel = 0;
-  nextPollChannel = pollDecisions(1,nextPollChannel)
+  nextPollChannel = pollDecisions(1,nextPollChannel);
 }
 
 void setup() {
