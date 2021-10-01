@@ -44,7 +44,9 @@ struct Task
 {
   uint8_t sensorID;
   uint8_t channelID;
+  uint8_t nextChannelID;
   uint8_t taskID;
+  bool setChannel;
 };
 
 // Define buffers and related variables
@@ -67,6 +69,7 @@ channel based on the sensorID and channelID attributes.
 */
 void executeTask(struct Task task)
 {
+  bool success = false;
   // Reading the capacitance empties the readingsBuffer and does not require 
   // a specific device to be addressed
   if (task.taskID == RC)
@@ -75,54 +78,11 @@ void executeTask(struct Task task)
     return;
   }
 
-  // Change multiplexer to address the correct device
-  uint8_t result;
-  Wire.beginTransmission(multiplexer_addr);
-  switch (task.sensorID)
-  {
-  case 1:
-      Wire.write(0b00010000);
-      break;
-  case 2:
-      Wire.write(0b00100000);
-      break;
-  case 3:
-      Wire.write(0b01000000);
-      break;
-  case 4:
-      Wire.write(0b10000000);
-      break;
-  default:
-      Serial.println(F("Invalid multiplexer channel."));
-      Wire.endTransmission();
-      return;
-  }
-  result = Wire.endTransmission();
-  
-  // Multiplexer will return False if operation was successful
-  if (result) {
-    Serial.println(F("Failed to set multiplexer output channel."));
-    return;
-  }
-  
-  // Set the AD7746 channel
-  bool success = false;
-  if (task.channelID == 1)
-  {
-    success = sensor.writeCapSetupRegister(0b10000000);
-  }
-  else if (task.channelID == 2)
-  {
-    success = sensor.writeCapSetupRegister(0b11000000);
-  }
-  else
-  {
-    Serial.println(F("Invalid channel ID."));
-    return;
-  }
+  // address the correct device and channel
+  success = changeMultiplexerAddress(task.sensorID);
   if (!success)
   {
-    Serial.println(F("Channel change was unsuccessful!"));
+    return;
   }
 
   // Now execute the correct task
@@ -155,6 +115,63 @@ void executeTask(struct Task task)
     Serial.println(F("Invalid taskID."));
     break;
   }
+}
+
+bool changeMultiplexerAddress(uint8_t sensorID)
+{
+  // Change multiplexer to address the correct device
+  bool success;
+  Wire.beginTransmission(multiplexer_addr);
+  switch (task.sensorID)
+  {
+  case 1:
+      Wire.write(0b00010000);
+      break;
+  case 2:
+      Wire.write(0b00100000);
+      break;
+  case 3:
+      Wire.write(0b01000000);
+      break;
+  case 4:
+      Wire.write(0b10000000);
+      break;
+  default:
+      Serial.println(F("Invalid multiplexer channel."));
+      Wire.endTransmission();
+      return;
+  }
+  success = Wire.endTransmission();
+  success = !success;
+  
+  // Multiplexer will return False if operation was successful
+  if (!success) {
+    Serial.println(F("Failed to set multiplexer output channel."));
+  }
+  return success;
+}
+
+bool changeAD7746channel(uint8_t channelID)
+{
+  bool success = false;
+  if (channelID == 1)
+  {
+    success = sensor.writeCapSetupRegister(0b10000000);
+  }
+  else if (channelID == 2)
+  {
+    success = sensor.writeCapSetupRegister(0b11000000);
+  }
+  else
+  {
+    Serial.println(F("Invalid channel ID."));
+    return success;
+  }
+  if (!success)
+  {
+    Serial.println(F("Channel change was unsuccessful!"));
+  }
+  return success;
 }
 
 /* readCapacitance empties the readingsBuffer into the messageBuffer.  It pulls 
@@ -190,6 +207,17 @@ about the sensor and timestamp.
 void readValue(struct Task task)
 {
     uint32_t reportedCap;
+    
+    if (task.setChannel)
+    {
+      bool success = false;
+      changeAD7746channel(task.channelID);
+      if (!success)
+      {
+        return;
+      }
+    }
+
     reportedCap = sensor.getCapacitance();
     struct sensorReading currentReading;
     struct sensorReading toDelete;
@@ -202,6 +230,12 @@ void readValue(struct Task task)
         readingsBuffer.pull(&toDelete);
     }
     readingsBuffer.add(currentReading);
+
+    // change channel pre-emptively for next readValue if required
+    if (task.nextChannelID != task.channelID)
+    {
+      changeAD7746channel(task.nextChannelID);
+    }
 }
 
 /* readStatus reads the status register from the AD7746 IC.  It formats the
@@ -211,6 +245,14 @@ the messageBuffer.
 void readStatus(struct Task task)
 {
     uint8_t reportedStatus;
+    bool success = false;
+
+    success = changeAD7746channel(task.channelID);
+    if (!success)
+    {
+      return;
+    }
+
     reportedStatus = sensor.reportStatus();
 
     messageBuffer[0] = 35;  // "#" start character
@@ -290,10 +332,13 @@ void buildTask(const char message[10])
  newTask.taskID = taskID;
  if (taskID != RC)
  {
-  uint8_t sensorID = message[3] - 48;
-  uint8_t channelID = message[4] - 48;
-  newTask.sensorID = sensorID;
-  newTask.channelID = channelID;
+  newTask.sensorID = message[3] - 48;
+  newTask.channelID = message[4] - 48;
+ }
+ if (taskID == RV)
+ {
+    newTask.nextChannelID = message[5] - 48;
+    newTask.setChannel = message[6] - 48;
  }  
  taskBuffer.add(newTask);
 }
@@ -339,7 +384,7 @@ void writeSerialResponse(uint8_t *response)
   }
 }
 
-/* ASCIIConvert takes a 32 bit value and converts it to a the ASCII
+/* ASCIIConvert takes a 32 bit value and converts it to the ASCII
 values representing the characters which define the value in
 HEX format.
 
@@ -374,23 +419,55 @@ void ASCIIConvert (uint32_t value,uint8_t *modified,int arraySize)
  }
 }
 
+void createReadValueTask(uint8_t sensorID,uint8_t channelID,uint8_t nextChannelID,bool setChannel)
+{
+  struct Task newTask;
+  newTask.taskID = RV;
+  newTask.sensorID = sensorID;
+  newTask.channelID = channelID;
+  newTask.nextChannelID = nextChannelID;
+  newTask.setChannel = setChannel
+  taskBuffer.add(newTask);
+}
+
 void ISR_4()
 {
-  if (activeSensors & 0b01000000)
+  bool channelOneActive = activeSensors & 0b01000000;
+  bool channelTwoActive = activeSensors & 0b10000000;
+  static uint8_t nextPollChannel = 0;
+
+  if (channelOneActive && channelTwoActive)
   {
-    struct Task newTask;
-    newTask.taskID = RV;
-    newTask.sensorID = 4;
-    newTask.channelID = 1;
-    taskBuffer.add(newTask);
+    if (nextPollChannel == 1)
+    {
+      nextPollChannel = 2;
+      createReadValueTask(4,1,nextPollChannel,false);
+    }
+    else if (nextPollChannel == 2)
+    {
+      nextPollChannel = 1;
+      createReadValueTask(4,2,nextPollChannel,false);
+    }
   }
-  if (activeSensors & 0b10000000)
+
+  else if (channelOneActive)
   {
-    struct Task newTask;
-    newTask.taskID = RV;
-    newTask.sensorID = 4;
-    newTask.channelID = 2;
-    taskBuffer.add(newTask);
+    if (nextPollChannel == 0)
+    {
+      createReadValueTask(4,1,1,true);
+    }
+    nextPollChannel = 1;
+    createReadValueTask(4,1,nextPollChannel,false);
+  }
+
+  else if (channelTwoActive)
+  {
+    if (nextPollChannel == 0)
+    {
+      createReadValueTask(4,2,2,true);
+    }
+    nextPollChannel = 2;
+    createReadValueTask(4,2,nextPollChannel,false);
   }
 }
 
