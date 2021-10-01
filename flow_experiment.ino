@@ -459,10 +459,9 @@ uint8_t pollDecisions(uint8_t device, uint8_t nextPollChannel)
     }
     else
     {
-      nextPollChannel = 1;
-      createReadValueTask(4,1,nextPollChannel,false);
+      createReadValueTask(4,1,1,false);
     }
-    
+    nextPollChannel = 1;
   }
 
   else if (channelTwoActive)
@@ -473,9 +472,9 @@ uint8_t pollDecisions(uint8_t device, uint8_t nextPollChannel)
     }
     else
     {
-      nextPollChannel = 2;
-      createReadValueTask(4,2,nextPollChannel,false);
+      createReadValueTask(4,2,2,false);
     }
+    nextPollChannel = 2;
   }
 
   return nextPollChannel;
