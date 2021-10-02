@@ -11,4 +11,4 @@ The GUI displays a representation of how the sensing elements are laid out relat
 
 The sensing elements may be clicked to enable the corresponding channel and begin streaming data.  With the desired data streaming, the record button may be pressed to begin writing the data to a file.  The output file can be specified using the browse button in the Save Path field.
 # Licence
-Distributed under the GNU License. See `LICENSE` for more information.
+Distributed under the BSD License. See `LICENSE` for more information.
