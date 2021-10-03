@@ -98,6 +98,9 @@ class flowControl(QtWidgets.QMainWindow):
             'recording':'background-color: rgb(138, 226, 52);'
         }
         
+        self.recording_flag = False
+        self.record_colour = 0
+
         # initialize sensor objects
         self.sensors = {}
         for i in range(8):
@@ -115,6 +118,8 @@ class flowControl(QtWidgets.QMainWindow):
         self.ui.s4c1_button.clicked.connect(lambda: self.ToggleStatus(self.ui.s4c1_button,6))
         self.ui.s4c2_button.clicked.connect(lambda: self.ToggleStatus(self.ui.s4c2_button,7))
 
+        self.ui.recordButton.clicked.connect(self.ToggleRecordStatus)
+
         # check the connection and status of each sensor
         if flowmeter_connected_flag:
             self.StartupConnectivityCheck()
@@ -125,6 +130,28 @@ class flowControl(QtWidgets.QMainWindow):
         self.loop_timer.setInterval(100)
         self.loop_timer.timeout.connect(self.PollSensors)
         self.loop_timer.start()
+
+        # Timer used to flash record button whilst recording
+        self.record_flash_timer = QtCore.QTimer()
+        self.record_flash_timer.setInterval(400)
+        self.record_flash_timer.timeout.connect(self.ToggleRecordColour)
+        self.record_flash_timer.start()
+
+    def ToggleRecordColour(self):
+        if self.recording_flag:
+            if self.record_colour == 0:
+                self.record_colour = 1
+                self.ui.recordButton.setStyleSheet('background-color: rgb(255, 0, 0);')
+            else:
+                self.record_colour = 0
+                self.ui.recordButton.setStyleSheet('')
+    
+    def ToggleRecordStatus(self):
+        if self.recording_flag == False:
+            self.recording_flag = True
+        else:
+            self.recording_flag = False
+            self.ui.recordButton.setStyleSheet('')
 
     def StartupConnectivityCheck(self):
         for ID in self.sensors:
@@ -179,7 +206,8 @@ class flowControl(QtWidgets.QMainWindow):
         }
         pressure_sensor[ID]['value'] = pressure*6894.76         # convert to Pa
         pressure_sensor[ID]['timestamp'] = timestamp
-        self.UpdatePressureLog(ID,pressure,timestamp)
+        if self.recording_flag:
+            self.UpdatePressureLog(ID,pressure,timestamp)
 
     def UpdatePressureLog(self,ID,pressure,timestamp):
         with open('data_log','a') as file:
@@ -209,7 +237,8 @@ class flowControl(QtWidgets.QMainWindow):
                 self.sensors[ID].timestamps = self.sensors[ID].timestamps[-100:]
                 self.sensors[ID].values = self.sensors[ID].values[-100:]
             
-            self.UpdateLogFile(sensor,channel,timestamp,value)
+            if self.recording_flag:
+                self.UpdateLogFile(sensor,channel,timestamp,value)
     
     def UpdatePlots(self):
         for ID in self.lines:
@@ -222,10 +251,10 @@ class flowControl(QtWidgets.QMainWindow):
         if self.sensors[ID].status == 0:
             self.sensors[ID].status = 1
             button.setStyleSheet(self.statii['polling'])
+        # elif self.sensors[ID].status == 1:
+        #     self.sensors[ID].status = 2
+        #     button.setStyleSheet(self.statii['recording'])
         elif self.sensors[ID].status == 1:
-            self.sensors[ID].status = 2
-            button.setStyleSheet(self.statii['recording'])
-        elif self.sensors[ID].status == 2:
             self.sensors[ID].status = 0
             button.setStyleSheet(self.statii['disabled'])
         # reset plot elements
