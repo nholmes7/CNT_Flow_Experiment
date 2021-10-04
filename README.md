@@ -1,5 +1,5 @@
 # About this Project
-This project was developed in the summer of 2021 as a means for testing experimental carbon-nanotube based flow sensors.  The project combines a graphical user interface (GUI) written in python, and microcontroller written for a Teensy 4.0 using the Arduino ecosystem.  The micro-controller reads sensor values from a set of Analog Devices AD7746 ICs over an I<sup>2</sup>C connection, buffers the values, and relays them to the computer over a serial connection.  The python program also polls two pressure transducers over serial connection.
+This project was developed in the summer of 2021 as a means for testing experimental carbon-nanotube based flow sensors.  The project combines a graphical user interface (GUI) written in python, and microcontroller code written for a Teensy 4.0 using the Arduino ecosystem.  The microcontroller reads sensor values from a set of Analog Devices AD7746 ICs over an I<sup>2</sup>C connection, buffers the values, and relays them to the python prgram over a USB serial connection.  The python program also polls two pressure transducers over USB serial connection.
 # Getting Started
 To get a local copy of this project running, follow these steps.
 ## Prerequisites
