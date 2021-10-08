@@ -8,7 +8,7 @@ To get a local copy of this project running, follow these steps.
 # Use
 The GUI displays a representation of how the sensing elements are laid out relative to one another.  A live plot of the streamed sensor values and a bar indicating the measured differential pressure are included for live monitoring of the experiment.
 
-<img src="images/UI_Screenshot.png" width="600">
+<img src="images/GUI Demo Oct 6.png" width="600">
 
 The sensing elements may be clicked to enable the corresponding channel and begin streaming data.  With the desired data streaming, the record button may be pressed to begin writing the data to a file.  The output file can be specified using the browse button in the Save Path field.
 # Licence
