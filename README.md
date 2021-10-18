@@ -5,7 +5,9 @@ The following instructions assume you have a working installation of python on y
 
 To get a local copy of this project running, follow these steps.
 
-1. Download the project files `main.py`, `gui.py` and `requirements.txt`.  The other files relate to the microcontroller code and are not necessary to run the user interface and collect data.
+1. Create a project folder.
+
+1. Download the project files `main.py`, `gui.py` and `requirements.txt` to your project folder.  The other files relate to the microcontroller code and are not necessary to run the user interface and collect data.
 
 1. Install [virtualenv](https://pypi.org/project/virtualenv/).
     ```
